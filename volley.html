@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Bóng Chuyền 2D Đơn Giản</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: #222;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: Arial, sans-serif;
+            color: white;
+        }
+        canvas {
+            background-color: #87CEEB; /* Bầu trời màu xanh */
+            border: 4px solid white;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas" width="800" height="500"></canvas>
+
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+// Cấu hình vật lý cơ bản
+const gravity = 0.6;
+
+// Đối tượng Lưới (Net)
+const net = {
+    x: canvas.width / 2 - 5,
+    y: canvas.height - 150,
+    width: 10,
+    height: 150,
+    color: "white"
+};
+
+// Người chơi 1 (Trái) - Điều khiển bằng phím A, D, W
+const player1 = {
+    x: 150, y: canvas.height - 60,
+    radius: 30, color: "#ff4757",
+    vx: 0, vy: 0, score: 0, speed: 6, jumpPower: -13
+};
+
+// Người chơi 2 (Phải) - Tự động (AI đơn giản) hoặc phím mũi tên
+const player2 = {
+    x: 650, y: canvas.height - 60,
+    radius: 30, color: "#2ed573",
+    vx: 0, vy: 0, score: 0, speed: 5, jumpPower: -13
+};
+
+// Quả bóng
+const ball = {
+    x: 200, y: 100,
+    radius: 15, color: "#ffa500",
+    vx: 4, vy: 0,
+    bounce: 1.02 // Tăng nhẹ lực nảy khi chạm người chơi
+};
+
+// Trạng thái bàn phím
+const keys = {};
+window.addEventListener("keydown", e => keys[e.code] = true);
+window.addEventListener("keyup", e => keys[e.code] = false);
+
+// Hàm reset bóng khi có điểm
+function resetBall(servingPlayer) {
+    ball.x = servingPlayer === 1 ? 200 : 600;
+    ball.y = 100;
+    ball.vx = servingPlayer === 1 ? 4 : -4;
+    ball.vy = 0;
+}
+
+// Xử lý va chạm hình tròn (Cầu thủ) và Bóng
+function checkBallCollision(player) {
+    let dx = ball.x - player.x;
+    let dy = ball.y - player.y;
+    let distance = Math.sqrt(dx * dx + dy * dy);
+
+    if (distance < player.radius + ball.radius) {
+        // Tính góc nảy dựa trên vị trí tiếp xúc
+        let angle = Math.atan2(dy, dx);
+        let speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
+        if (speed < 8) speed = 10; // Đảm bảo bóng không bị đứng im
+
+        ball.vx = Math.cos(angle) * speed * ball.bounce;
+        ball.vy = Math.sin(angle) * speed * ball.bounce;
+        
+        // Đẩy bóng ra ngoài phạm vi vật thể để tránh dính góc
+        ball.x = player.x + Math.cos(angle) * (player.radius + ball.radius);
+        ball.y = player.y + Math.sin(angle) * (player.radius + ball.radius);
+    }
+}
+
+// Cập nhật logic game
+function update() {
+    // --- DI CHUYỂN PLAYER 1 ---
+    if (keys["KeyA"] && player1.x > player1.radius) player1.vx = -player1.speed;
+    else if (keys["KeyD"] && player1.x < net.x - player1.radius) player1.vx = player1.speed;
+    else player1.vx = 0;
+
+    if (keys["KeyW"] && player1.y === canvas.height - player1.radius) {
+        player1.vy = player1.jumpPower;
+    }
+
+    // --- DI CHUYỂN PLAYER 2 (AI Đơn giản) ---
+    // AI sẽ tự di chuyển theo trục X của quả bóng nếu bóng nằm bên sân của nó
+    if (ball.x > net.x) {
+        if (ball.x < player2.x - 10 && player2.x > net.x + net.width + player2.radius) {
+            player2.vx = -player2.speed;
+        } else if (ball.x > player2.x + 10 && player2.x < canvas.width - player2.radius) {
+            player2.vx = player2.speed;
+        } else {
+            player2.vx = 0;
+        }
+        // Tự động nhảy lên đập bóng nếu bóng ở gần và đủ cao
+        if (ball.y < player2.y && Math.abs(ball.x - player2.x) < 50 && player2.y === canvas.height - player2.radius) {
+            player2.vy = player2.jumpPower;
+        }
+    } else {
+        // Nếu bóng bên sân đối phương, AI tự động lùi về giữa sân nhà
+        if (player2.x > 620) player2.vx = -player2.speed;
+        else if (player2.x < 580) player2.vx = player2.speed;
+        else player2.vx = 0;
+    }
+
+    // Áp dụng vật lý trọng lực cho Người chơi
+    player1.x += player1.vx;
+    player1.y += player1.vy;
+    player2.x += player2.vx;
+    player2.y += player2.vy;
+
+    if (player1.y < canvas.height - player1.radius) player1.vy += gravity;
+    else { player1.y = canvas.height - player1.radius; player1.vy = 0; }
+
+    if (player2.y < canvas.height - player2.radius) player2.vy += gravity;
+    else { player2.y = canvas.height - player2.radius; player2.vy = 0; }
+
+
+    // --- VẬT LÝ QUẢ BÓNG ---
+    ball.vy += gravity;
+    ball.x += ball.vx;
+    ball.y += ball.vy;
+
+    // Bóng chạm tường trái / phải
+    if (ball.x - ball.radius < 0 || ball.x + ball.radius > canvas.width) {
+        ball.vx = -ball.vx;
+    }
+
+    // Kiểm tra va chạm với cầu thủ
+    checkBallCollision(player1);
+    checkBallCollision(player2);
+
+    // Va chạm với Lưới (Đơn giản hóa bằng hộp chữ nhật)
+    if (ball.x + ball.radius > net.x && ball.x - ball.radius < net.x + net.width && ball.y + ball.radius > net.y) {
+        ball.vx = -ball.vx * 0.8; // Bị nảy ngược lại khi đập lưới
+    }
+
+    // --- TÍNH ĐIỂM KHI BÓNG CHẠM ĐẤT ---
+    if (ball.y + ball.radius >= canvas.height) {
+        if (ball.x < net.x) {
+            player2.score++; // Bóng rơi sân trái -> Player 2 ăn điểm
+            resetBall(1);    // Giao bóng cho bên thua
+        } else {
+            player1.score++; // Bóng rơi sân phải -> Player 1 ăn điểm
+            resetBall(2);
+        }
+    }
+}
+
+// Vẽ đồ họa lên màn hình
+function draw() {
+    // Xóa màn hình cũ
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Vẽ mặt đất (Cát/Sàn)
+    ctx.fillStyle = "#eccc68";
+    ctx.fillRect(0, canvas.height - 20, canvas.width, 20);
+
+    // Vẽ lưới
+    ctx.fillStyle = net.color;
+    ctx.fillRect(net.x, net.y, net.width, net.height);
+
+    // Vẽ Player 1 (Hình bán nguyệt hoặc hình tròn đơn giản)
+    ctx.beginPath();
+    ctx.arc(player1.x, player1.y, player1.radius, 0, Math.PI * 2);
+    ctx.fillStyle = player1.color;
+    ctx.fill();
+    ctx.closePath();
+
+    // Vẽ Player 2
+    ctx.beginPath();
+    ctx.arc(player2.x, player2.y, player2.radius, 0, Math.PI * 2);
+    ctx.fillStyle = player2.color;
+    ctx.fill();
+    ctx.closePath();
+
+    // Vẽ Quả Bóng
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+    ctx.fillStyle = ball.color;
+    ctx.fill();
+    ctx.closePath();
+
+    // Hiển thị Điểm số
+    ctx.fillStyle = "white";
+    ctx.font = "bold 32px Arial";
+    ctx.fillText(player1.score, 100, 50);
+    ctx.fillText(player2.score, canvas.width - 130, 50);
+}
+
+// Vòng lặp game (Game Loop)
+function gameLoop() {
+    update();
+    draw();
+    requestAnimationFrame(gameLoop);
+}
+
+// Bắt đầu game
+gameLoop();
+</script>
+</body>
+</html>
